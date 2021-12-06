@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div>
+    <p>State:</p>
+    <p id="state" />
+</div>
+<div>
+    <label for="name">Name </label>
+    <input id="name"/>
+    <input id="name-submit" type="button" value="Update Name"/>
+</div>
+<div>
+    <label for="add-item-id">Item ID </label>
+    <input id="add-item-id"/>
+    <input id="add-item" type="button" value="Add item"/>
+</div>
+<div>
+    <label for="del-item-id">Item ID</label>
+    <input id="del-item-id"/>
+    <input id="delete-item" type="button" value="Delete item"/>
+</div>
+<div>
+    <label for="update-item-id">Item ID</label>
+    <input id="update-item-id"/>
+    <label for="update-item-status">Item Status</label>
+    <select id="update-item-status">
+        <option value="created">Created</option>
+        <option value="validated">Validated</option>
+        <option value="expired">Expired</option>
+    </select>
+    <input id="update-item" type="button" value="Update item"/>
+</div>
+<script type="application/javascript" src="wasm_exec.js"></script>
+<script type="application/javascript" id="wasm">
+    const go = new Go(); // Defined in wasm_exec.js
+    const WASM_URL = 'wasm.wasm';
+
+    var wasm;
+    var state = {};
+
+    stateElem = document.getElementById('state')
+    updateName = document.getElementById('name')
+    addItemId = document.getElementById('add-item-id')
+    delItemId = document.getElementById('del-item-id')
+    updateItemId = document.getElementById('update-item-id')
+    updateItemStatus = document.getElementById('update-item-status')
+
+    function updateState(next) {
+        state = next
+        console.log("updated state: ", state)
+        stateElem.textContent = JSON.stringify(state)
+    }
+
+    // NameUpdatedEvent
+    // ItemAddedEvent
+    // ItemDeletedEvent
+    // ItemStatusUpdatedEvent
+    document.getElementById('name-submit').addEventListener('click', ev => {
+        conn.send(JSON.stringify({
+            type: 'NameUpdatedEvent',
+            data: {
+                id: '1',
+                name: updateName.value,
+            }
+        }))
+    })
+    document.getElementById('add-item').addEventListener('click', ev => {
+        conn.send(JSON.stringify({
+            type: 'ItemAddedEvent',
+            data: {
+                thingId: '1',
+                itemId: addItemId.value,
+                status: 'created',
+            }
+        }))
+    })
+    document.getElementById('delete-item').addEventListener('click', ev => {
+        conn.send(JSON.stringify({
+            type: 'ItemDeletedEvent',
+            data: {
+                thingId: '1',
+                itemId: delItemId.value,
+            }
+        }))
+    })
+    document.getElementById('update-item').addEventListener('click', ev => {
+        conn.send(JSON.stringify({
+            type: 'ItemStatusUpdatedEvent',
+            data: {
+                thingId: '1',
+                itemId: updateItemId.value,
+                status: updateItemStatus.value,
+            }
+        }))
+    })
+
+    function connect() {
+        if (window["WebSocket"]) {
+            conn = new WebSocket("ws://" + document.location.host + "/ws/boards/1");
+            conn.onclose = function (evt) {
+                var item = document.createElement("div");
+                item.innerHTML = "<b>Connection closed.</b>";
+                appendLog(item);
+            };
+            conn.onmessage = function (evt) {
+                var messages = evt.data.split('\n');
+                for (var i = 0; i < messages.length; i++) {
+                    if (!messages[i]) {
+                        continue
+                    }
+                    console.log("received message: ", messages[i])
+                    handleEvent(JSON.stringify(state), messages[i], updateState)
+                }
+            };
+        } else {
+            var item = document.createElement("div");
+            item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+        }
+    }
+
+    if ('instantiateStreaming' in WebAssembly) {
+        WebAssembly.instantiateStreaming(fetch(WASM_URL), go.importObject).then(function (obj) {
+            wasm = obj.instance;
+            go.run(wasm);
+            // console.log('multiplied two numbers:', wasm.exports.multiply(5, 3));
+            connect();
+        })
+    } else {
+        fetch(WASM_URL).then(resp =>
+            resp.arrayBuffer()
+        ).then(bytes =>
+            WebAssembly.instantiate(bytes, go.importObject).then(function (obj) {
+                wasm = obj.instance;
+                go.run(wasm);
+                // console.log('multiplied two numbers:', wasm.exports.multiply(5, 3));
+                connect();
+            })
+        )
+    }
+</script>
+</body>
+</html>

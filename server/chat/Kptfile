@@ -1,0 +1,11 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: chat
+upstream:
+  type: git
+  git:
+    commit: e8629af678b7fe13f35dff5e197de93b4148a909
+    repo: git@github.com:gorilla/websocket
+    directory: /examples/chat
+    ref: master
